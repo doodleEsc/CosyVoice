@@ -116,7 +116,7 @@ async def stream(request: InferenceRequest):
         )
 
     model_output = cosyvoice.inference_instruct(tts_text, role, instruct, stream=True)
-    return StreamingResponse(generate_data(model_output, bit_depth, sample_rate))
+    return StreamingResponse(generate_data(model_output, bit_depth))
 
 
 @app.get("/inference_zero_shot")
