@@ -22,6 +22,10 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import numpy as np
+from scipy.signal import resample
+
+from pydantic import BaseModel, Field, constr, model_validator
+from typing import Optional, Literal
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append("{}/../../..".format(ROOT_DIR))
@@ -40,10 +44,57 @@ app.add_middleware(
 )
 
 
-def generate_data(model_output):
+class InferenceRequest(BaseModel):
+    query: str
+    role: Optional[str] = "中文男"
+    instruct: Optional[str] = (
+        "Ultraman Tiga, the Giant of Light, is a brave and determined guardian of Earth. He is full of a sense of justice and passion."
+    )
+    bit_depth: Optional[Literal[8, 16, 24, 32]] = None  # 可选参数，支持的位深
+    sample_rate: Optional[Literal[16000, 22050, 44100]] = None  # 可选参数，支持的采样率
+    # TODO: 格式待后续实现
+    # format: Optional[Literal["acc", "wav", "ogg", "mp3"]] = None  # 可选参数，支持的格式
+
+    @model_validator(mode="before")
+    def check_bitDepth_and_sampleRate(cls, values):
+        bit_depth = values.get("bit_depth")
+        sample_rate = values.get("sample_rate")
+
+        if (bit_depth is None) != (sample_rate is None):
+            raise ValueError(
+                "bit_depth and sample_rate must both be provided or both be omitted."
+            )
+        return values
+
+
+def generate_data(model_output, bit_depth=None, sample_rate=None):
     for i in model_output:
-        # tts_audio = (i['tts_speech'].numpy() * (2 ** 15)).astype(np.int16).tobytes()
-        tts_audio = i["tts_speech"].numpy().tobytes()
+        samples = i["tts_speech"].numpy()
+        original_sample_rate = i.get("sample_rate", 22050)  # Default sample rate
+
+        # Resample if necessary
+        if sample_rate and sample_rate != original_sample_rate:
+            num_samples = int(len(samples) * sample_rate / original_sample_rate)
+            samples = resample(samples, num_samples)
+
+        # Convert to desired bit depth
+        if bit_depth == 8:
+            samples = ((samples + 1.0) * 127.5).astype(np.uint8)  # pyright: ignore
+        elif bit_depth == 16:
+            samples = (samples * 32767).astype(np.int16)  # pyright: ignore
+        elif bit_depth == 24:
+            samples = (samples * 8388607).astype(np.int32)  # pyright: ignore
+            samples_bytes = samples.astype(np.int32).tobytes()
+            # Extract 3 bytes per sample
+            samples = (
+                np.frombuffer(samples_bytes, dtype=np.uint8)
+                .reshape(-1, 4)[:, :3]
+                .flatten()
+            )
+        elif bit_depth == 32:
+            samples = (samples * 2147483647).astype(np.int32)  # pyright: ignore
+
+        tts_audio = samples.tobytes()  # pyright: ignore
         yield tts_audio
 
 
@@ -53,36 +104,26 @@ async def inference_sft(tts_text: str = Form(), spk_id: str = Form()):
     return StreamingResponse(generate_data(model_output))
 
 
-@app.post("/inference_instruct/stream")
-async def instruct_stream(request: Request):
-    question_data = await request.json()
-    tts_text = question_data.get("query")
-    role = question_data.get("role")
-    instruct = question_data.get("instruct")
+@app.post("/inference/stream")
+async def stream(request: InferenceRequest):
+    tts_text = request.query
+    role = request.role
+    instruct = request.instruct
+    bit_depth = request.bit_depth
+    sample_rate = request.sample_rate
+
     if not tts_text:
         raise HTTPException(
             status_code=400, detail="Query parameter 'query' is required"
         )
 
     if not instruct:
-        instruct = "Theo 'Crimson', is a fiery, passionate rebel leader. Fights with fervor for justice, but struggles with impulsiveness."
-
-    model_output = cosyvoice.inference_instruct(tts_text, role, instruct, stream=True)
-    return StreamingResponse(generate_data(model_output))
-
-
-@app.post("/inference/stream")
-async def stream(request: Request):
-    question_data = await request.json()
-    tts_text = question_data.get("query")
-    role = question_data.get("role")
-    if not tts_text:
         raise HTTPException(
-            status_code=400, detail="Query parameter 'query' is required"
+            status_code=400, detail="Query parameter 'instruct' is required"
         )
 
-    model_output = cosyvoice.inference_sft(tts_text, role, stream=True)
-    return StreamingResponse(generate_data(model_output))
+    model_output = cosyvoice.inference_instruct(tts_text, role, instruct, stream=True)
+    return StreamingResponse(generate_data(model_output, bit_depth, sample_rate))
 
 
 @app.get("/inference_zero_shot")
