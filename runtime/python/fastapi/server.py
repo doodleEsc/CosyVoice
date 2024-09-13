@@ -51,31 +51,25 @@ class InferenceRequest(BaseModel):
         "Ultraman Tiga, the Giant of Light, is a brave and determined guardian of Earth. He is full of a sense of justice and passion."
     )
     bit_depth: Optional[Literal[8, 16, 24, 32]] = None  # 可选参数，支持的位深
-    sample_rate: Optional[Literal[16000, 22050, 44100]] = None  # 可选参数，支持的采样率
+    # sample_rate: Optional[Literal[16000, 22050, 44100]] = None  # 可选参数，支持的采样率
     # TODO: 格式待后续实现
     # format: Optional[Literal["acc", "wav", "ogg", "mp3"]] = None  # 可选参数，支持的格式
 
-    @model_validator(mode="before")
-    def check_bitDepth_and_sampleRate(cls, values):
-        bit_depth = values.get("bit_depth")
-        sample_rate = values.get("sample_rate")
+    # @model_validator(mode="before")
+    # def check_bitDepth_and_sampleRate(cls, values):
+    #     bit_depth = values.get("bit_depth")
+    #     sample_rate = values.get("sample_rate")
+    #
+    #     if (bit_depth is None) != (sample_rate is None):
+    #         raise ValueError(
+    #             "bit_depth and sample_rate must both be provided or both be omitted."
+    #         )
+    #     return values
 
-        if (bit_depth is None) != (sample_rate is None):
-            raise ValueError(
-                "bit_depth and sample_rate must both be provided or both be omitted."
-            )
-        return values
 
-
-def generate_data(model_output, bit_depth=None, sample_rate=None):
+def generate_data(model_output, bit_depth=None):
     for i in model_output:
         samples = i["tts_speech"].numpy()
-        original_sample_rate = i.get("sample_rate", 22050)  # Default sample rate
-
-        # Resample if necessary
-        if sample_rate and sample_rate != original_sample_rate:
-            num_samples = int(len(samples) * sample_rate / original_sample_rate)
-            samples = resample(samples, num_samples)
 
         # Convert to desired bit depth
         if bit_depth == 8:
@@ -110,7 +104,6 @@ async def stream(request: InferenceRequest):
     role = request.role
     instruct = request.instruct
     bit_depth = request.bit_depth
-    sample_rate = request.sample_rate
 
     if not tts_text:
         raise HTTPException(
