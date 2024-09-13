@@ -115,6 +115,9 @@ async def stream(request: InferenceRequest):
             status_code=400, detail="Query parameter 'instruct' is required"
         )
 
+    print(
+        f"query: {tts_text}, role: {role}, instruct: {instruct}, bit_depth: {bit_depth}"
+    )
     model_output = cosyvoice.inference_instruct(tts_text, role, instruct, stream=True)
     return StreamingResponse(generate_data(model_output, bit_depth))
 
