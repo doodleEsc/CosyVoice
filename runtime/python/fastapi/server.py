@@ -229,7 +229,7 @@ async def Chat(request: ChatRequest):
 
     print(
         CHATBOT.invoke(
-            {"ability": ability, "question": question},
+            {"ability": ability, "question": question, "role": role},
             config={"configurable": {"session_id": session_id}},
         )
     )
