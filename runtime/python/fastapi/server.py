@@ -134,6 +134,12 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     role: Optional[str] = "初代奥特曼"
     ability: Optional[str] = "聊天"
+    spk_id: Optional[str] = "中文男"
+    instruct: Optional[str] = (
+        "Ultraman Tiga, the Giant of Light, is a brave and determined guardian of Earth. He is full of a sense of justice and passion."
+    )
+    bit_depth: Optional[Literal[8, 16, 24, 32]] = None  # 可选参数，支持的位深
+    # stream: Optional[bool] = False
     question: str
     session_id: str
 
@@ -222,6 +228,10 @@ async def Chat(request: ChatRequest):
     session_id = request.session_id
     role = request.role
     ability = request.ability
+    spk_id = request.spk_id
+    instruct = request.instruct
+    bit_depth = request.bit_depth
+    # stream = request.stream
 
     print(
         f"question: {question}\nsession_id: {session_id}\nrole: {role}\nability: {ability}"
@@ -230,7 +240,15 @@ async def Chat(request: ChatRequest):
         {"ability": ability, "question": question, "role": role},
         config={"configurable": {"session_id": session_id}},
     )
-    return JSONResponse(content={"content": resp.content})
+
+    model_output = cosyvoice.inference_instruct(
+        resp.content,
+        spk_id,
+        instruct,
+        stream=True,  # pyright: ignore
+    )
+
+    return StreamingResponse(generate_data(model_output, bit_depth))
 
 
 @app.get("/inference_zero_shot")
