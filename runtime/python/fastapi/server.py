@@ -25,17 +25,8 @@ from langchain_core.messages import BaseMessage
 from langchain_core.runnables.history import RunnableWithMessageHistory
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
-from fastapi import (
-    FastAPI,
-    HTTPException,
-    Response,
-    UploadFile,
-    Form,
-    File,
-    Request,
-    JSONResponse,
-)
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Response, UploadFile, Form, File, Request
+from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import numpy as np
