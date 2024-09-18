@@ -230,7 +230,7 @@ async def Chat(request: ChatRequest):
         {"ability": ability, "question": question, "role": role},
         config={"configurable": {"session_id": session_id}},
     )
-    return JSONResponse(content=resp)
+    return JSONResponse(content=resp.to_json())
 
 
 @app.get("/inference_zero_shot")
