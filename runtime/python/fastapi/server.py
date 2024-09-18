@@ -11,7 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from io import BytesIO
+import uuid
 import os
+import httpx
 import sys
 import argparse
 import logging
@@ -141,6 +144,7 @@ class ChatRequest(BaseModel):
     bit_depth: Optional[Literal[8, 16, 24, 32]] = None  # 可选参数，支持的位深
     # stream: Optional[bool] = False
     question: str
+    question_type: Optional[Literal["text", "audio"]] = "text"
     session_id: str
 
 
@@ -165,6 +169,37 @@ class InferenceRequest(BaseModel):
     #             "bit_depth and sample_rate must both be provided or both be omitted."
     #         )
     #     return values
+
+
+async def stt(audio: bytes) -> str:
+    """语音转文字
+
+    Args:
+        audio: 音频二进制
+
+    Returns:
+        文本
+    """
+    ASR_URL = os.environ.get("ASR_URL")
+    # 准备多部分表单请求
+    files = {
+        "files": ("files", audio, "application/octet-stream"),
+        "keys": (None, str(uuid.uuid4())),
+        "lang": (None, "zh"),
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(ASR_URL, files=files)  # pyright: ignore
+
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    # 解析响应
+    try:
+        res = response.json()
+        return {"result": res["result"][0]["text"]}  # pyright: ignore
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="解析ASR服务响应时出错")
 
 
 def generate_data(model_output, bit_depth=None):
@@ -232,6 +267,53 @@ async def Chat(request: ChatRequest):
     instruct = request.instruct
     bit_depth = request.bit_depth
     # stream = request.stream
+
+    print(
+        f"question: {question}\nsession_id: {session_id}\nrole: {role}\nability: {ability}"
+    )
+    resp = CHATBOT.invoke(
+        {"ability": ability, "question": question, "role": role},
+        config={"configurable": {"session_id": session_id}},
+    )
+
+    model_output = cosyvoice.inference_instruct(
+        resp.content,
+        spk_id,
+        instruct,
+        stream=True,  # pyright: ignore
+    )
+
+    return StreamingResponse(generate_data(model_output, bit_depth))
+
+
+# class ChatRequest(BaseModel):
+#     role: Optional[str] = "初代奥特曼"
+#     ability: Optional[str] = "聊天"
+#     spk_id: Optional[str] = "中文男"
+#     instruct: Optional[str] = (
+#         "Ultraman Tiga, the Giant of Light, is a brave and determined guardian of Earth. He is full of a sense of justice and passion."
+#     )
+#     bit_depth: Optional[Literal[8, 16, 24, 32]] = None  # 可选参数，支持的位深
+#     # stream: Optional[bool] = False
+#     question: str
+#     question_type: Optional[Literal["text", "audio"]] = "text"
+#     session_id: str
+
+
+@app.post("/v2/inference/stream2")
+async def AudioChat(
+    audio: UploadFile,
+    session_id: str = Form(...),
+    role: Optional[str] = Form("初代奥特曼"),
+    ability: Optional[str] = Form("聊天"),
+    spk_id: Optional[str] = Form("中文男"),
+    instruct: Optional[str] = Form(
+        "Ultraman Tiga, the Giant of Light, is a brave and determined guardian of Earth. He is full of a sense of justice and passion."
+    ),
+    bit_depth: Optional[Literal[8, 16, 24, 32]] = None,  # 可选参数，支持的位深
+):
+    audio_bytes = await audio.read()
+    question = await stt(audio_bytes)
 
     print(
         f"question: {question}\nsession_id: {session_id}\nrole: {role}\nability: {ability}"
