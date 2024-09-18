@@ -21,7 +21,7 @@ import dotenv
 from langchain_openai.chat_models import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, AIMessage
 from langchain_core.runnables.history import RunnableWithMessageHistory
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
@@ -230,7 +230,7 @@ async def Chat(request: ChatRequest):
         {"ability": ability, "question": question, "role": role},
         config={"configurable": {"session_id": session_id}},
     )
-    return JSONResponse(content=resp.to_json())
+    return JSONResponse(content={"content": resp.content})
 
 
 @app.get("/inference_zero_shot")
