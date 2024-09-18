@@ -25,7 +25,16 @@ from langchain_core.messages import BaseMessage
 from langchain_core.runnables.history import RunnableWithMessageHistory
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
-from fastapi import FastAPI, HTTPException, Response, UploadFile, Form, File, Request
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Response,
+    UploadFile,
+    Form,
+    File,
+    Request,
+    JSONResponse,
+)
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -230,7 +239,7 @@ async def Chat(request: ChatRequest):
         {"ability": ability, "question": question, "role": role},
         config={"configurable": {"session_id": session_id}},
     )
-    return Response(content=resp.to_json())
+    return JSONResponse(content=resp)
 
 
 @app.get("/inference_zero_shot")
