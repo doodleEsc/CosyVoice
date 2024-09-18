@@ -226,22 +226,11 @@ async def Chat(request: ChatRequest):
     print(
         f"question: {question}\nsession_id: {session_id}\nrole: {role}\nability: {ability}"
     )
-
-    # print(
-    #     CHATBOT.invoke(
-    #         {"ability": ability, "question": question, "role": role},
-    #         config={"configurable": {"session_id": session_id}},
-    #     )
-    # )
-
     resp = CHATBOT.invoke(
         {"ability": ability, "question": question, "role": role},
         config={"configurable": {"session_id": session_id}},
     )
-
-    print(resp.content)
-
-    return Response(content=resp)
+    return Response(content=resp.to_json())
 
 
 @app.get("/inference_zero_shot")
