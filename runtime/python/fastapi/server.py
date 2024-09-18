@@ -233,6 +233,14 @@ async def Chat(request: ChatRequest):
             config={"configurable": {"session_id": session_id}},
         )
     )
+
+    resp = CHATBOT.invoke(
+        {"ability": ability, "question": question, "role": role},
+        config={"configurable": {"session_id": session_id}},
+    )
+
+    print(resp.content)
+
     return Response(content="OK")
 
 
