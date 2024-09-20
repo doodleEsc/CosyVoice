@@ -14,15 +14,13 @@
 from io import BytesIO
 import uuid
 import os
-from asyncio_mqtt.client import Client
+from aiomqtt.client import Client
 import httpx
 import sys
 import argparse
 import logging
 import dotenv
 import json
-
-import asyncio_mqtt
 
 from datetime import datetime
 from langchain_openai.chat_models import ChatOpenAI
