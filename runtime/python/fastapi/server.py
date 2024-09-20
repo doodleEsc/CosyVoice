@@ -129,7 +129,7 @@ def create_chatbot(memory_size: int = 10):
     return chain_with_history
 
 
-def create_mqtt_client(host: str | None = None, port: int | None = None) -> Client:
+def create_mqtt_client(host: str | None, port: int | None) -> Client:
     host = host if host is not None else os.environ.get("MQTT_HOST")  # pyright: ignore
     port = port if port is not None else int(os.environ.get("MQTT_PORT"))  # pyright: ignore
 
