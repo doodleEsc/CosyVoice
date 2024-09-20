@@ -21,6 +21,7 @@ import argparse
 import logging
 import dotenv
 import json
+import re
 
 from datetime import datetime
 from langchain_openai.chat_models import ChatOpenAI
@@ -108,6 +109,26 @@ def get_current_time():
     now = datetime.now()
     formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
     return formatted_time
+
+
+def remove_pattern(text):
+    # 定义要去掉的模式
+    patterns = [
+        r"\[laughter\]",  # 匹配 [laughter]
+        r"\[breath\]",  # 匹配 [breath]
+        r"<laughter>",  # 匹配 <laughter>
+        r"</laughter>",  # 匹配 </laughter>
+        r"<strong>",  # 匹配 <strong>
+        r"</strong>",  # 匹配 </strong>
+    ]
+
+    # 使用 re.sub 去掉这些模式
+    for pattern in patterns:
+        text = re.sub(pattern, "", text)
+
+    # 去掉多余的空格
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 
 def create_chatbot(memory_size: int = 10):
@@ -308,7 +329,11 @@ async def Chat(request: ChatRequest):
     )
 
     # publish replay to mqtt
-    message = {"content": resp.content, "type": "replay", "time": get_current_time()}
+    message = {
+        "content": remove_pattern(resp.content),
+        "type": "replay",
+        "time": get_current_time(),
+    }
     topic = f"figurine/{session_id}/message"
     await publish(message, topic)
 
