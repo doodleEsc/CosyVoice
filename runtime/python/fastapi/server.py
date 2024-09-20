@@ -133,8 +133,10 @@ def create_chatbot(memory_size: int = 10):
 def create_mqtt_client() -> Client:
     host = os.environ.get("MQTT_HOST")  # pyright: ignore
     port = int(os.environ.get("MQTT_PORT"))  # pyright: ignore
+    username = os.environ.get("MQTT_USERNAME")
+    password = os.environ.get("MQTT_PASSWORD")
 
-    client = Client(hostname=host, port=port)  # pyright: ignore
+    client = Client(hostname=host, port=port, username=username, password=password)  # pyright: ignore
     return client
 
 
