@@ -140,14 +140,13 @@ def create_mqtt_client() -> Client:
 
 CHATBOT = create_chatbot(10)
 
-MQTT_CLIENT = create_mqtt_client()
-
 
 async def publish(message: Dict, topic: str):
-    resp = await MQTT_CLIENT.publish(
-        topic, payload=json.dumps(message, ensure_ascii=False)
-    )
-    print(resp)
+    async with create_mqtt_client() as client:
+        resp = await client.publish(
+            topic, payload=json.dumps(message, ensure_ascii=False)
+        )
+        print(resp)
 
 
 app = FastAPI()
