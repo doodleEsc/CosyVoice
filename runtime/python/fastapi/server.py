@@ -14,13 +14,16 @@
 from io import BytesIO
 import uuid
 import os
+from asyncio_mqtt.client import Client
 import httpx
 import sys
 import argparse
 import logging
 import dotenv
 
+import asyncio_mqtt
 
+from datetime import datetime
 from langchain_openai.chat_models import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.chat_history import BaseChatMessageHistory
@@ -36,7 +39,7 @@ import numpy as np
 from scipy.signal import resample
 
 from pydantic import BaseModel, Field
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Dict
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append("{}/../../..".format(ROOT_DIR))
@@ -102,6 +105,12 @@ def get_history_by_session_id_factory(memory_size: int):
     return get_history_by_session_id
 
 
+def get_current_time():
+    now = datetime.now()
+    formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
+    return formatted_time
+
+
 def create_chatbot(memory_size: int = 10):
     """
     创建一个聊天机器人。
@@ -120,7 +129,22 @@ def create_chatbot(memory_size: int = 10):
     return chain_with_history
 
 
+def create_mqtt_client(host: str | None = None, port: int | None = None) -> Client:
+    host = host if host is not None else os.environ.get("MQTT_HOST")  # pyright: ignore
+    port = port if port is not None else int(os.environ.get("MQTT_PORT"))  # pyright: ignore
+
+    client = Client(hostname=host, port=port)  # pyright: ignore
+    return client
+
+
 CHATBOT = create_chatbot(10)
+
+MQTT_CLIENT = create_mqtt_client()
+
+
+async def publish(message: Dict, topic: str):
+    resp = await MQTT_CLIENT.publish(topic, payload=message)
+    print(resp)
 
 
 app = FastAPI()
@@ -144,7 +168,6 @@ class ChatRequest(BaseModel):
     bit_depth: Optional[Literal[8, 16, 24, 32]] = None  # 可选参数，支持的位深
     # stream: Optional[bool] = False
     question: str
-    question_type: Optional[Literal["text", "audio"]] = "text"
     session_id: str
 
 
@@ -271,10 +294,21 @@ async def Chat(request: ChatRequest):
     print(
         f"question: {question}\nsession_id: {session_id}\nrole: {role}\nability: {ability}"
     )
+
+    # publish to mqtt
+    message = {"content": question, "type": "question", "time": get_current_time()}
+    topic = f"figurine/{session_id}/message"
+    await publish(message, topic)
+
     resp = CHATBOT.invoke(
         {"ability": ability, "question": question, "role": role},
         config={"configurable": {"session_id": session_id}},
     )
+
+    # publish replay to mqtt
+    message = {"content": resp.content, "type": "replay", "time": get_current_time()}
+    topic = f"figurine/{session_id}/message"
+    await publish(message, topic)
 
     model_output = cosyvoice.inference_instruct(
         resp.content,
